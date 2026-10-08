@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Memorias Vivas · Mumbú</title>
+  <meta name="description" content="Ruta de turismo comunitario Memorias Vivas: Mumbú, Resiliencia y Tradición. Relatos, saberes y memoria del río San Juan, Tadó, Chocó.">
+  <meta name="theme-color" content="#1B3B2B">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <!-- ============================================================
+       1. BARRA DE ESTADO DE CONEXIÓN
+       ============================================================ -->
+  <div class="status" id="status" role="status" aria-live="polite">
+    <span class="status__dot" aria-hidden="true"></span>
+    <span id="status-text">Modo Local · Territorio Mumbú</span>
+  </div>
+
+  <!-- ============================================================
+       2. HEADER Y CONTEXTO TERRITORIAL
+       ============================================================ -->
+  <header class="head">
+    <p class="head__route">Memorias Vivas <span aria-hidden="true">|</span> Selva Viva Living</p>
+    <p class="head__kicker" id="st-kicker">Estación 01 de 04</p>
+    <h1 class="head__title" id="st-title">El Abrazo del Río y la Bienvenida</h1>
+    <p class="head__tagline" id="st-tagline"></p>
+    <p class="head__place" id="st-place"></p>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <!-- ==========================================================
+         3. BIBLIOTECA DE VOCES (AUDIO INTERPRETATIVO)
+         ========================================================== -->
+    <section class="block voice" aria-labelledby="voice-h">
+      <h2 class="eyebrow" id="voice-h">Biblioteca de Voces</h2>
+      <article class="player" id="player">
+        <div class="player__who">
+          <p class="player__name" id="narrator">Relato</p>
+          <p class="player__role" id="narrator-role"></p>
+        </div>
+
+        <!-- Audio nativo; los controles visibles son propios (accesibles) -->
+        <audio id="audio" preload="none"></audio>
+
+        <div class="player__controls">
+          <button class="player__btn" id="btn-play" type="button" aria-label="Reproducir relato" aria-pressed="false">
+            <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+          </button>
+          <div class="player__track">
+            <label class="sr-only" for="seek">Posición del relato</label>
+            <input class="player__seek" id="seek" type="range" min="0" max="100" step="0.1" value="0">
+            <div class="player__time"><span id="t-cur">0:00</span><span id="t-dur">--:--</span></div>
+          </div>
+        </div>
+        <p class="player__note" id="audio-note" hidden></p>
+      </article>
+
+      <details class="transcript">
+        <summary>Leer transcripción del relato</summary>
+        <div class="transcript__body" id="transcript"></div>
+      </details>
+    </section>
+
+    <!-- ==========================================================
+         4. FICHA BIOCULTURAL DE SABERES
+         ========================================================== -->
+    <section class="block" aria-labelledby="ficha-h">
+      <h2 class="eyebrow" id="ficha-h">Ficha biocultural de saberes</h2>
+      <p class="ficha" id="ficha"></p>
+      <ul class="tags" id="tags" aria-label="Etiquetas"></ul>
+    </section>
+
+    <!-- ==========================================================
+         5. GALERÍA DE MEMORIA Y RESILIENCIA
+         ========================================================== -->
+    <section class="block" aria-labelledby="gal-h">
+      <h2 class="eyebrow" id="gal-h">Galería de memoria y resiliencia</h2>
+      <div class="gallery" id="gallery"></div>
+    </section>
+
+    <!-- ==========================================================
+         6. LLAMADO A LA ACCIÓN Y ECONOMÍA COMUNITARIA
+         ========================================================== -->
+    <section class="block cta" aria-labelledby="cta-h">
+      <h2 class="eyebrow" id="cta-h">Para llevarse</h2>
+      <p class="cta__q" id="question"></p>
+      <button class="btn btn--gold" id="btn-support" type="button">Apoyar a la Asociación de Productores de Mumbú</button>
+      <button class="btn btn--line" id="btn-offline" type="button">Guardar audios para usar sin señal</button>
+      <p class="cta__small" id="offline-msg" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <!-- ============================================================
+       7. SELECTOR DE RUTA (TABS INFERIORES)
+       ============================================================ -->
+  <nav class="tabs" aria-label="Estaciones de la ruta">
+    <ol class="tabs__list" id="tabs"></ol>
+  </nav>
+
+  <!-- ============================================================
+       8. DRAWER DE COMPRA COMUNITARIA DIRECTA
+       ============================================================ -->
+  <dialog class="drawer" id="drawer" aria-labelledby="drawer-h">
+    <form method="dialog" class="drawer__inner">
+      <div class="drawer__grip" aria-hidden="true"></div>
+      <h2 class="drawer__title" id="drawer-h">Compra directa, sin intermediarios</h2>
+      <p>Todo lo que compre o aporte aquí llega a la Asociación de Productores de Mumbú y a las familias que siembran, muelen, destilan y narran esta ruta.</p>
+
+      <div class="lot">
+        <p class="eyebrow">Lote actual de viche</p>
+        <dl class="lot__grid" id="lot"></dl>
+      </div>
+
+      <ul class="offer" id="offer"></ul>
+
+      <div class="contact">
+        <p class="eyebrow">Contacto de la Asociación</p>
+        <p class="contact__num" id="contact-num"></p>
+        <button class="btn btn--line btn--sm" id="btn-copy" type="button">Copiar número</button>
+        <p class="cta__small" id="copy-msg" aria-live="polite"></p>
+      </div>
+
+      <p class="drawer__legal">Venta y degustación solo para mayores de 18 años. Las recetas de los curados son saber propio de las familias y no se publican.</p>
+      <button class="btn btn--green" value="close">Cerrar</button>
+    </form>
+  </dialog>
+
+  <noscript><p class="noscript">Esta guía necesita JavaScript activado para mostrar las estaciones.</p></noscript>
+  <script src="js/app.js" defer></script>
+</body>
+</html>

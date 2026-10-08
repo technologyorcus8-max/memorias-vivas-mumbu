@@ -1,0 +1,1 @@
+Coloque aquí las fotos WebP (600x800, <60 KB) y referéncielas en js/app.js.

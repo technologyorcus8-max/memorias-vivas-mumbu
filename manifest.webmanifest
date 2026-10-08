@@ -1,0 +1,17 @@
+{
+  "name": "Memorias Vivas: Mumbú, Resiliencia y Tradición",
+  "short_name": "Memorias Vivas",
+  "description": "Ruta de turismo comunitario en Mumbú, Tadó, Chocó: relatos, saberes y memoria del río San Juan.",
+  "lang": "es-CO",
+  "start_url": "./?estacion=1",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8F6F0",
+  "theme_color": "#1B3B2B",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
