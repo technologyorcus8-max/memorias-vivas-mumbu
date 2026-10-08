@@ -5,7 +5,8 @@
      2. ART       ilustraciones SVG de reemplazo mientras no hay fotos
      3. ROUTER    lectura de ?estacion=N y navegación sin recargar
      4. VIEW      pintado de la estación en el DOM
-     5. PLAYER    reproductor de audio accesible
+     5. BIBLIOTECA + PLAYER  catálogo central de audios y reproductor
+                (grabación real o voz de demostración)
      6. NET       estado de conexión + Service Worker + audios offline
      7. SHOP      drawer de compra comunitaria directa
    ================================================================= */
@@ -17,7 +18,8 @@
      Todos los textos son BORRADOR para validar con la comunidad.
      Los nombres de narradores son de ejemplo: reemplazarlos por los
      de quienes graben, con su consentimiento firmado.
-     Audios: colocar los MP3 en /audio con el nombre indicado.
+     Audios: viven en la biblioteca central orcus-audios (ver 5a);
+     audioId debe coincidir con el id de la pista en catalogo.json.
      Fotos: poner la ruta en "src" (WebP < 60 KB); vacío = ilustración.
      --------------------------------------------------------------- */
   const DATA = {
@@ -47,7 +49,7 @@
         lugar: "Tótem del embarcadero, orilla del río San Juan",
         narrador: "Relato de Tía Rosalba",
         rol: "Sabedora de Mumbú · nombre de ejemplo",
-        audio: "audio/estacion-01.mp3",
+        audioId: "estacion-01",
         transcripcion: [
           "Buenas, buenas. Bienvenidos a Mumbú.",
           "Yo soy hija de esta orilla. Aquí nací, aquí aprendí a nadar, a sembrar y a moler la caña.",
@@ -73,7 +75,7 @@
         lugar: "Destilería comunitaria, junto a la cachimba",
         narrador: "Maestro Destilador Eusebio",
         rol: "Vichero de la destilería · nombre de ejemplo",
-        audio: "audio/estacion-02.mp3",
+        audioId: "estacion-02",
         transcripcion: [
           "Esta caña la sembramos nosotros, sin químicos. La molemos en el trapiche y el guarapo se deja reposar varios días.",
           "Esto es la cachimba, el alambique. El guarapo se calienta despacio y el vapor se vuelve gotas.",
@@ -97,7 +99,7 @@
         lugar: "Azotea detrás de la cocina y finca de pancoger",
         narrador: "Relato de Doña Ana Lucía",
         rol: "Cocinera tradicional · nombre de ejemplo",
-        audio: "audio/estacion-03.mp3",
+        audioId: "estacion-03",
         transcripcion: [
           "La azotea es la huerta en alto, en una canoa vieja o un cajón sobre palos, para que no la alcancen las gallinas ni la creciente.",
           "Aquí está la chillangua, el alma de nuestra cocina. El poleo, la albahaca, el orégano de hoja ancha. Unas son para la olla y otras para el remedio.",
@@ -120,7 +122,7 @@
         lugar: "Playa de mazamorreo, orilla del San Juan",
         narrador: "Relato de Doña Etelvina",
         rol: "Minera tradicional de batea · nombre de ejemplo",
-        audio: "audio/estacion-04.mp3",
+        audioId: "estacion-04",
         transcripcion: [
           "Esta batea era de mi abuela. Con ella se lava la arena del río, dando vueltas, hasta que queda la jagua, la arena negra. Ahí, si el río quiere, brilla el oro.",
           "Nosotros no usamos mercurio. La batea no tumba el monte ni mata el río. Por eso todavía hay pescado.",
@@ -241,69 +243,200 @@
         else a.removeAttribute("aria-current");
       });
 
-      PLAYER.cargar(e.audio);
+      PLAYER.cargar(e);
     }
   };
 
   /* ---------------------------------------------------------------
-     5. PLAYER — audio con controles propios y accesibles
+     5a. BIBLIOTECA — catálogo central de audios de ORCUS
+     Los audios viven en un repositorio aparte (orcus-audios) servido
+     por GitHub Pages. Cada app lee catalogo.json y busca sus pistas por
+     proyecto + id. Para mudar la biblioteca a otro servidor basta con
+     cambiar BIBLIOTECA.base.
+     --------------------------------------------------------------- */
+  const BIBLIOTECA = (() => {
+    const cfg = {
+      // Misma raíz que la app: en GitHub Pages es
+      // https://technologyorcus8-max.github.io/orcus-audios/ y en una
+      // Raspberry Pi local basta con copiar la biblioteca en /orcus-audios/.
+      base: new URL("/orcus-audios/", location.origin).href,
+      proyecto: "memorias-vivas-mumbu"
+    };
+    let pistas = null; // id -> { url, narrador, duracion, estado }
+
+    async function cargar() {
+      if (pistas) return pistas;
+      pistas = {};
+      try {
+        const r = await fetch(cfg.base + "catalogo.json", { cache: "no-cache" });
+        if (!r.ok) throw new Error(r.status);
+        const cat = await r.json();
+        const p = (cat.proyectos || []).find(x => x.id === cfg.proyecto);
+        (p ? p.pistas : []).forEach(t => {
+          pistas[t.id] = {
+            url: t.archivo && t.estado === "publicado" ? new URL(t.archivo, cfg.base).href : null,
+            narrador: t.narrador, duracion: t.duracion, estado: t.estado
+          };
+        });
+      } catch (err) {
+        console.warn("[Biblioteca] catálogo no disponible; se usa voz de demostración", err);
+      }
+      return pistas;
+    }
+    return {
+      cfg,
+      async pista(id) { const p = await cargar(); return p[id] || null; },
+      async todas() { return cargar(); }
+    };
+  })();
+
+  /* ---------------------------------------------------------------
+     5b. PLAYER — dos motores con los mismos controles:
+       · "archivo": la grabación real publicada en la biblioteca.
+       · "voz": si aún no hay grabación, el teléfono lee la
+         transcripción con su propia voz en español (Web Speech API),
+         marcada como VOZ SINTÉTICA DE DEMOSTRACIÓN.
      --------------------------------------------------------------- */
   const PLAYER = (() => {
     const audio = $("audio"), btn = $("btn-play"), seek = $("seek");
     const cur = $("t-cur"), dur = $("t-dur"), note = $("audio-note");
-    let arrastrando = false;
+    const badge = $("audio-badge"), tx = document.querySelector(".transcript");
+    const voz = "speechSynthesis" in window ? window.speechSynthesis : null;
+    let modo = "archivo", arrastrando = false, estacion = null, carga = 0;
+
+    // Estado del motor de voz
+    let parrafos = [], idx = 0, hablando = false, totalChars = 1, charsAntes = [], tick = null, t0 = 0, baseCharsSeg = 14;
 
     function estado(sonando) {
       btn.setAttribute("aria-pressed", String(sonando));
       btn.setAttribute("aria-label", sonando ? "Pausar relato" : "Reproducir relato");
     }
-    function progreso() {
-      const p = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+    function pintarProgreso(p, segundos) {
       if (!arrastrando) seek.value = p;
       seek.style.setProperty("--p", p + "%");
-      cur.textContent = fmt(audio.currentTime);
+      cur.textContent = fmt(segundos);
     }
     function aviso(txt) { note.textContent = txt; note.hidden = !txt; }
+    function marca(txt) { badge.textContent = txt; badge.hidden = !txt; }
 
+    /* ---------- Motor de voz (demostración) ---------- */
+    function elegirVoz() {
+      const vs = voz.getVoices().filter(v => /^es[-_]/i.test(v.lang) || v.lang === "es");
+      const pref = ["es-CO", "es-US", "es-419", "es-MX", "es-VE", "es-ES"];
+      for (const l of pref) {
+        const v = vs.find(v => v.lang.replace("_", "-").toLowerCase() === l.toLowerCase());
+        if (v) return v;
+      }
+      return vs[0] || null;
+    }
+    function resaltar(i) {
+      document.querySelectorAll("#transcript p").forEach((p, k) => p.classList.toggle("is-reading", k === i));
+    }
+    function progresoVoz(extra = 0) {
+      const leidos = (charsAntes[idx] || 0) + extra;
+      const p = Math.min(100, (leidos / totalChars) * 100);
+      pintarProgreso(p, leidos / baseCharsSeg);
+    }
+    function hablar(desde) {
+      voz.cancel();
+      idx = desde;
+      if (idx >= parrafos.length) return terminarVoz(true);
+      const u = new SpeechSynthesisUtterance(parrafos[idx]);
+      const v = elegirVoz();
+      u.lang = v ? v.lang : "es-CO";
+      try { if (v) u.voice = v; } catch (_) { /* voz no asignable: se usa el idioma */ }
+      u.rate = 0.95; u.pitch = 1;
+      u.onstart = () => {
+        t0 = performance.now(); resaltar(idx);
+        clearInterval(tick);
+        tick = setInterval(() => progresoVoz(Math.min(parrafos[idx].length, ((performance.now() - t0) / 1000) * baseCharsSeg)), 250);
+      };
+      u.onend = () => { clearInterval(tick); if (hablando) hablar(idx + 1); };
+      u.onerror = ev => { if (ev.error !== "interrupted" && ev.error !== "canceled") { terminarVoz(false); aviso("Este teléfono no pudo leer el relato en voz alta. Lea la transcripción."); } };
+      voz.speak(u);
+    }
+    function terminarVoz(completo) {
+      hablando = false; clearInterval(tick); estado(false); resaltar(-1);
+      if (completo) { idx = 0; pintarProgreso(0, 0); }
+    }
+
+    /* ---------- Controles comunes ---------- */
     btn.addEventListener("click", () => {
-      if (audio.paused) {
-        audio.play().catch(() => aviso("No se pudo reproducir el audio. Lea la transcripción mientras tanto."));
-      } else audio.pause();
+      if (modo === "archivo") {
+        if (audio.paused) audio.play().catch(() => usarVoz("No se pudo cargar la grabación."));
+        else audio.pause();
+        return;
+      }
+      if (!voz) { aviso("Este navegador no puede leer en voz alta. Lea la transcripción."); tx.open = true; return; }
+      if (hablando) { hablando = false; voz.cancel(); clearInterval(tick); estado(false); }
+      else { hablando = true; estado(true); tx.open = true; hablar(idx); }
     });
+
     audio.addEventListener("play", () => estado(true));
     audio.addEventListener("pause", () => estado(false));
     audio.addEventListener("ended", () => { estado(false); audio.currentTime = 0; });
-    audio.addEventListener("timeupdate", progreso);
-    audio.addEventListener("loadedmetadata", () => { dur.textContent = fmt(audio.duration); aviso(""); });
-    audio.addEventListener("error", () => {
-      estado(false);
-      aviso(navigator.onLine
-        ? "Este relato todavía no se ha grabado en Mumbú. Puede leer la transcripción abajo."
-        : "Sin señal y este audio no está guardado. Lea la transcripción o pida al guía la versión local.");
-      const t = document.querySelector(".transcript"); if (t) t.open = true;
+    audio.addEventListener("timeupdate", () => {
+      if (modo !== "archivo") return;
+      pintarProgreso(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0, audio.currentTime);
     });
+    audio.addEventListener("loadedmetadata", () => { if (modo === "archivo") dur.textContent = fmt(audio.duration); });
+    audio.addEventListener("error", () => { if (modo === "archivo" && audio.getAttribute("src")) usarVoz(navigator.onLine ? "" : "Sin señal y la grabación no está guardada."); });
 
     seek.addEventListener("input", () => { arrastrando = true; seek.style.setProperty("--p", seek.value + "%"); });
     seek.addEventListener("change", () => {
-      if (audio.duration) audio.currentTime = (seek.value / 100) * audio.duration;
       arrastrando = false;
+      if (modo === "archivo") { if (audio.duration) audio.currentTime = (seek.value / 100) * audio.duration; return; }
+      // En voz: salta al párrafo correspondiente
+      const objetivo = (seek.value / 100) * totalChars;
+      let i = 0; while (i < parrafos.length - 1 && charsAntes[i + 1] <= objetivo) i++;
+      idx = i; progresoVoz();
+      if (hablando) hablar(idx); else resaltar(idx);
+    });
+    seek.addEventListener("keydown", ev => {
+      if (modo === "archivo" && audio.duration) {
+        if (ev.key === "ArrowRight") audio.currentTime = Math.min(audio.duration, audio.currentTime + 10);
+        if (ev.key === "ArrowLeft") audio.currentTime = Math.max(0, audio.currentTime - 10);
+      }
     });
 
-    // Atajo de teclado: barra espaciadora en el botón ya funciona; flechas mueven 10 s
-    seek.addEventListener("keydown", ev => {
-      if (!audio.duration) return;
-      if (ev.key === "ArrowRight") audio.currentTime = Math.min(audio.duration, audio.currentTime + 10);
-      if (ev.key === "ArrowLeft") audio.currentTime = Math.max(0, audio.currentTime - 10);
-    });
+    function usarVoz(motivo) {
+      audio.pause(); audio.removeAttribute("src"); audio.load();
+      modo = "voz";
+      parrafos = estacion.transcripcion.slice();
+      charsAntes = []; let acc = 0;
+      parrafos.forEach((p, i) => { charsAntes[i] = acc; acc += p.length; });
+      totalChars = Math.max(1, acc); idx = 0;
+      dur.textContent = "≈ " + fmt(totalChars / baseCharsSeg);
+      pintarProgreso(0, 0);
+      marca(voz ? "Voz sintética de demostración" : "");
+      aviso((motivo ? motivo + " " : "") + (voz
+        ? `La grabación con la voz real de ${estacion.narrador.replace(/^Relato de /, "")} se hará en Mumbú. Mientras tanto, el teléfono lee la transcripción.`
+        : "La grabación se hará en Mumbú. Lea la transcripción abajo."));
+    }
+
+    // Algunos teléfonos cargan las voces tarde
+    if (voz && voz.onvoiceschanged !== undefined) voz.onvoiceschanged = () => {};
 
     return {
-      cargar(src) {
-        audio.pause();
-        audio.src = src;          // preload="none": no gasta datos hasta pulsar Play
-        seek.value = 0; seek.style.setProperty("--p", "0%");
-        cur.textContent = "0:00"; dur.textContent = "--:--";
-        estado(false); aviso("");
-      }
+      async cargar(e) {
+        const mio = ++carga;
+        estacion = e;
+        if (voz) voz.cancel();
+        hablando = false; clearInterval(tick); resaltar(-1);
+        audio.pause(); estado(false); aviso(""); marca("");
+        pintarProgreso(0, 0); dur.textContent = "--:--";
+
+        const p = await BIBLIOTECA.pista(e.audioId);
+        if (mio !== carga) return; // el usuario ya cambió de estación
+        if (p && p.url) {
+          modo = "archivo";
+          audio.src = p.url;       // preload="none": no gasta datos hasta pulsar Play
+          if (p.duracion) dur.textContent = p.duracion;
+        } else {
+          usarVoz("");
+        }
+      },
+      detener() { if (voz) voz.cancel(); hablando = false; audio.pause(); }
     };
   })();
 
@@ -343,16 +476,19 @@
       btn.addEventListener("click", async () => {
         btn.disabled = true; msg.textContent = "Guardando relatos…";
         const cache = await caches.open("mv-audio-v1");
+        const pistas = await BIBLIOTECA.todas();
+        const urls = DATA.estaciones.map(e => pistas[e.audioId] && pistas[e.audioId].url).filter(Boolean);
         let ok = 0;
-        for (const e of DATA.estaciones) {
+        for (const u of urls) {
           try {
-            const r = await fetch(e.audio, { cache: "no-store" });
-            if (r.ok) { await cache.put(e.audio, r); ok++; }
-          } catch (_) { /* sin red o archivo inexistente */ }
+            const r = await fetch(u, { cache: "no-store" });
+            if (r.ok) { await cache.put(u, r); ok++; }
+          } catch (_) { /* sin red */ }
         }
-        msg.textContent = ok === DATA.estaciones.length
-          ? "Listo: los 4 relatos quedaron guardados en este teléfono."
-          : `Se guardaron ${ok} de ${DATA.estaciones.length} relatos. Los demás aún no están grabados o no hay señal.`;
+        const falta = DATA.estaciones.length - urls.length;
+        msg.textContent = urls.length === 0
+          ? "Aún no hay grabaciones publicadas. Sin señal, el teléfono leerá las transcripciones en voz alta."
+          : `Se guardaron ${ok} de ${urls.length} grabaciones.` + (falta ? ` ${falta} relato(s) se leerán con la voz del teléfono.` : "");
         btn.disabled = false;
       });
     }

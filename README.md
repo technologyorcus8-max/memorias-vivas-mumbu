@@ -34,8 +34,10 @@ fichas (máx. 140 palabras), etiquetas, galería, pregunta, datos del lote y el
 contacto de la Asociación.
 **Todos los textos y los nombres de narradores son borradores o ejemplos** para validar con la comunidad.
 
-- **Audios:** coloque `audio/estacion-01.mp3` … `estacion-04.mp3`. Recomendado: mono, 48–64 kbps
-  (2:30 min ≈ 1 MB). Mientras falte un archivo, el reproductor avisa que el relato está por grabar y abre la transcripción.
+- **Audios:** viven en la biblioteca central **orcus-audios** (`https://technologyorcus8-max.github.io/orcus-audios/`).
+  Cada estación tiene un `audioId` (`estacion-01` … `estacion-04`) que corresponde a una pista de `catalogo.json`.
+  Mientras una pista esté `pendiente`, el teléfono lee la transcripción en voz alta, marcada como
+  **voz sintética de demostración**, y resalta el párrafo que va leyendo. Al publicar la grabación real, la app la usa sola.
 - **Fotos:** WebP de 600×800 px y menos de 60 KB en `img/`; ponga la ruta en `galeria[].src`.
   Cada foto necesita el consentimiento de las personas que aparecen.
 - Al cambiar archivos, suba `CACHE_VERSION` en `sw.js` (por ejemplo `mv-shell-v2`) para que los teléfonos reciban la actualización.

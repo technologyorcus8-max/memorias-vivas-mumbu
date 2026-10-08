@@ -8,7 +8,7 @@
      peticiones Range (necesarias en iPhone/Safari para <audio>).
    Sube CACHE_VERSION cada vez que cambien los archivos.
    ================================================================= */
-const CACHE_VERSION = "mv-shell-v1";
+const CACHE_VERSION = "mv-shell-v2";
 const AUDIO_CACHE = "mv-audio-v1";
 const IMG_CACHE = "mv-img-v1";
 
@@ -55,8 +55,8 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // 2) Audios
-  if (url.pathname.includes("/audio/")) {
+  // 2) Audios (de la biblioteca orcus-audios o locales)
+  if (/\.(mp3|m4a|aac|ogg|opus|wav)$/i.test(url.pathname)) {
     event.respondWith(audio(req));
     return;
   }

@@ -120,6 +120,12 @@ main:focus { outline: none; }
   background: var(--papel); border: 0;
 }
 .player__seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--papel); border: 0; }
+.player__badge {
+  justify-self: start; margin-top: .45rem;
+  font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--selva); background: var(--viche); border-radius: 999px; padding: .2rem .6rem;
+}
+.player__who { display: grid; }
 .player__note {
   font-size: .85rem; line-height: 1.45;
   background: rgba(248,246,240,.1); border-radius: 8px; padding: .55rem .75rem;
@@ -139,6 +145,9 @@ main:focus { outline: none; }
   font-family: var(--font-serif); font-size: 1.08rem; line-height: 1.6;
   max-width: 38rem;
 }
+
+.transcript__body p { border-left: 3px solid transparent; padding-left: .6rem; margin-left: -.6rem; transition: background-color .2s, border-color .2s; }
+.transcript__body p.is-reading { border-left-color: var(--viche); background: #f5e3bd; }
 
 /* ---------- 7. Ficha biocultural ---------- */
 .ficha { max-width: 38rem; }
