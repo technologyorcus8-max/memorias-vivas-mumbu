@@ -8,7 +8,7 @@
      peticiones Range (necesarias en iPhone/Safari para <audio>).
    Sube CACHE_VERSION cada vez que cambien los archivos.
    ================================================================= */
-const CACHE_VERSION = "mv-shell-v2";
+const CACHE_VERSION = "mv-shell-v3";
 const AUDIO_CACHE = "mv-audio-v1";
 const IMG_CACHE = "mv-img-v1";
 
@@ -61,13 +61,20 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // 3) Imágenes: caché primero, guarda las nuevas
+  // 3) Catálogo de la biblioteca: red primero (para ver grabaciones nuevas
+  //    al instante) y caché si no hay señal
+  if (url.pathname.endsWith("/catalogo.json")) {
+    event.respondWith(redPrimero(req));
+    return;
+  }
+
+  // 4) Imágenes: caché primero, guarda las nuevas
   if (req.destination === "image") {
     event.respondWith(cacheFirst(req, IMG_CACHE));
     return;
   }
 
-  // 4) Resto de estáticos: stale-while-revalidate
+  // 5) Resto de estáticos: stale-while-revalidate
   event.respondWith(staleWhileRevalidate(req));
 });
 
@@ -81,6 +88,17 @@ async function navegacion(req) {
     return (await cache.match("./index.html")) || (await cache.match("./")) ||
       new Response("<h1>Sin conexión</h1><p>Abra esta guía una vez con señal para guardarla.</p>",
         { headers: { "Content-Type": "text/html; charset=utf-8" } });
+  }
+}
+
+async function redPrimero(req) {
+  const cache = await caches.open(CACHE_VERSION);
+  try {
+    const r = await promesaConLimite(fetch(req, { cache: "no-store" }), 4000);
+    if (r.ok) cache.put(req.url, r.clone());
+    return r;
+  } catch (_) {
+    return (await cache.match(req.url)) || new Response('{"proyectos":[]}', { headers: { "Content-Type": "application/json" } });
   }
 }
 
